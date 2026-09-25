@@ -1,0 +1,56 @@
+{
+  "shapes": [
+    {
+      "name": "house",
+      "shape": {
+        "type": "CompoundShape",
+        "shapes": [
+          {
+            "type": "Rectangle",
+            "parameters": {
+              "length": 18,
+              "width": 10,
+              "x": 8,
+              "y": 2,
+              "char": "#"
+            }
+          },
+          {
+            "type": "Triangle",
+            "parameters": {
+              "x1": 6,
+              "y1": 12,
+              "x2": 17,
+              "y2": 20,
+              "x3": 28,
+              "y3": 12,
+              "char": "^"
+            }
+          },
+          {
+            "type": "Rectangle",
+            "parameters": {
+              "length": 4,
+              "width": 6,
+              "x": 15,
+              "y": 2,
+              "char": "+"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "sun",
+      "shape": {
+        "type": "Circle",
+        "parameters": {
+          "radius": 3,
+          "x": 38,
+          "y": 19,
+          "char": "o"
+        }
+      }
+    }
+  ]
+}
