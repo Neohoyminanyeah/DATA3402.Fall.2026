@@ -13,7 +13,7 @@ and labs are pushed as the semester progresses.
 | `Chapters/` | The course text, one PDF per chapter, with a review question set |
 | `Lectures/` | One folder per lecture: notebooks and/or slide PDFs |
 | `Labs/` | One folder per lab assignment, plus the GitHub setup guide |
-| `sample.ipynb` | Minimal notebook to check your environment works |
+| `sample.ipynb` | Notebook whose one code cell prints `Hello World!`, to check Jupyter can run code |
 | `requirements.txt` | Python packages used in the course |
 
 ## The course text
@@ -40,7 +40,7 @@ More chapters land as the semester goes on.
 
 ## Getting started
 
-We do all of this together in the first lab session. These are the same steps, so you
+We did all of this together in the first lab session. These are the same steps, so you
 can catch up or start over.
 
 You need Linux, macOS, or Windows **with WSL**. On Windows, WSL is required — not a
@@ -86,8 +86,9 @@ later assignments, but it is not a substitute for having a working setup.
    drives are visible from Linux at `/mnt/c`, and your Linux files are visible from
    Windows File Explorer at `\\wsl.localhost\Ubuntu`.
 
-4. **Clone this repository and install the requirements.** The clone is read-only for
-   now; `git pull` brings you new lectures and labs as they are released.
+4. **Clone this repository and install the requirements.** The clone is read-only;
+   `git pull` brings you new lectures and labs as they are released. Submitting work also
+   needs your own fork — see *Labs and submission* below.
 
    ```bash
    cd ~/Data-3402
@@ -114,10 +115,17 @@ later assignments, but it is not a substitute for having a working setup.
 ## Notes on large data
 
 Several lectures and labs use datasets too large to keep in git (the SUSY dataset,
-Kaggle competition data, image sets). Those are downloaded by the notebooks
-themselves and are excluded via `.gitignore` — don't commit them.
+Kaggle competition data, image sets). They are not in this repository: you download
+them when a lecture or lab tells you to. `.gitignore` excludes them under the names the
+course uses, along with the pickles and model files the notebooks write — don't commit
+them. GitHub refuses files over 100 MB, so a committed dataset stops your pushes.
 
 ## Labs and submission
+
+**Lab 5 has two parts.** `Labs/Lab.5/Lab.5.ipynb` is the matrix class, the main assignment.
+`Labs/Lab.5/Lab.5.CommandLine.ipynb` is the shorter piece we work through in the lab session:
+getting a data file into shape from the command line, using `bank-churn.csv` beside it and
+files already in `Lectures/`. Nothing to download.
 
 Lab work is submitted through your own **fork** of this repository:
 
@@ -125,16 +133,62 @@ Lab work is submitted through your own **fork** of this repository:
 - you **pull from this repository** to receive new lectures and labs as they are released;
 - you do your lab work in your fork and **push to your fork**, which is where it is graded.
 
-**Don't fork yet.** The clone from *Getting started* is all you need to follow along, and
-it is deliberately read-only — you can pull, but you can't push to it. We set up forks
-together, step by step, in the lab session that covers git and GitHub, and that session
-reuses the directory you already have: it keeps the one remote you already have, called
-`origin`, and repoints only its *push* address at your fork. From then on `git pull` brings
-class material and `git push` sends your work to your fork. Nothing you do today has to be
-undone.
+We set this up together in the Lab 4 session (Friday 9/11). If you missed it or need to
+start over, Part 1 of `Labs/Lab.4/Lab.4.ipynb` walks through it, and `Labs/GitHub-Setup.pdf`
+has the same steps line by line — including logging in to GitHub from the terminal, which
+you need before your first push — plus a table of what to do when git complains. In short:
 
-`Labs/GitHub-Setup.pdf` is the written version of that session.
-Read it then, not now.
+1. **Fork this repository.** On its GitHub page, press **Fork** at the top right and fork it
+   into your own account.
+
+2. **Clone your fork**, not this repository:
+
+   ```bash
+   cd ~/Data-3402
+   git clone https://github.com/YOUR_USERNAME/DATA3402.Fall.2026.git
+   cd DATA3402.Fall.2026
+   ```
+
+   **Already have the clone from *Getting started*?** Then `~/Data-3402/DATA3402.Fall.2026`
+   exists, and cloning your fork into the same place stops with *destination path already
+   exists*. Don't clone again, and don't delete that folder: `cd ~/Data-3402/DATA3402.Fall.2026`
+   and carry on with step 3, which works on that clone unchanged.
+
+3. **Fix the remotes**, so that pulls come from this repository and pushes go to your fork:
+
+   ```bash
+   git remote remove origin
+   git remote add origin https://github.com/UTA-DataScience/DATA3402.Fall.2026.git
+   git remote set-url --push origin https://github.com/YOUR_USERNAME/DATA3402.Fall.2026.git
+   git remote -v
+   ```
+
+   `git remote -v` should show this repository for **fetch** and your fork for **push**. If
+   both lines show the same URL, the `set-url --push` didn't take; run it again. If you use SSH
+   keys, your fork's URL is `git@github.com:YOUR_USERNAME/DATA3402.Fall.2026.git`, in both the
+   clone and the `set-url --push`.
+
+From then on `git pull` brings class material and `git push` sends your work to your fork.
+
+**The moment you pull a new lab, copy it to a new name and work only in the copy** — never
+edit the file we handed out:
+
+```bash
+cp Labs/Lab.3/Lab.3.ipynb Labs/Lab.3/Lab.3.solution.ipynb
+```
+
+`git pull` only touches files it recognizes from this repository, so a copy under a name we
+never handed out can't conflict with a fix we push later. To submit, commit your copy, push,
+and check on GitHub that your fork shows the new commit:
+
+```bash
+git add Labs/Lab.3/Lab.3.solution.ipynb
+git commit -m "Lab 3 submission"
+git push
+```
+
+Commit only your own copies. If you run a lecture notebook in place and commit it, the next
+release of that lecture can conflict when you pull; `Labs/GitHub-Setup.pdf` says how to recover.
 
 ## Communication
 

@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Distribution Detective</title>
+<style>
+:root{--bg:#fafaf7;--fg:#1d1d1b;--mut:#6b6b66;--card:#fff;--bd:#dcdcd4;--c1:#2563eb;--c2:#e11d48;--ok:#15803d;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#15161a;--fg:#ecece8;--mut:#9a9a94;--card:#1e2026;--bd:#363944;--c1:#60a5fa;--c2:#fb7185;--ok:#4ade80}}
+:root[data-theme="dark"]{--bg:#15161a;--fg:#ecece8;--mut:#9a9a94;--card:#1e2026;--bd:#363944;--c1:#60a5fa;--c2:#fb7185;--ok:#4ade80}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.5 system-ui,-apple-system,Segoe UI,sans-serif}
+main{max-width:1000px;margin:0 auto;padding:18px}
+h1{margin:0 0 4px;font-size:24px}p.s{color:var(--mut);margin:0 0 14px}
+.bar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px;margin-bottom:12px}
+label{font-size:13px;color:var(--mut);display:flex;gap:6px;align-items:center}
+select,button{font:inherit;padding:6px 10px;border-radius:8px;border:1px solid var(--bd);background:var(--card);color:var(--fg);cursor:pointer}
+button.p{background:var(--c1);color:#fff;border-color:var(--c1)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(290px,1fr));gap:10px}
+canvas{width:100%;height:200px;background:var(--card);border:1px solid var(--bd);border-radius:8px;display:block}
+.note{background:var(--card);border:1px solid var(--bd);border-radius:10px;padding:12px;margin-top:12px;font-size:14px}
+#guess button{margin:3px}.good{color:var(--ok);font-weight:600}.bad{color:var(--c2);font-weight:600}
+</style></head><body><main>
+<h1>Distribution Detective</h1>
+<p class="s">Build a dataset with one of the four mechanisms (or none), watch the six diagnostic panels react, then switch to mystery mode and diagnose one blind.</p>
+<div class="bar" id="bench">
+<label>Mechanism <select id="mech"><option value="normal">none (plain normal)</option><option value="mixture">mixture</option><option value="correlated">correlated</option><option value="heavy">heavy tail</option><option value="product">product</option></select></label>
+<label>Strength <input type="range" id="str" min="0" max="1" step="0.01" value="0.7"></label>
+<label>n <input type="range" id="n" min="100" max="2000" step="100" value="1000"><span id="nv">1000</span></label>
+<button id="re">New sample</button>
+<button class="p" id="mys">Mystery mode</button>
+<button id="up">Load lab .npz</button><input type="file" id="fi" accept=".npz" hidden>
+</div>
+<div class="bar" id="lab" hidden><b>Lab dataset</b><span id="ds"></span><label><input type="checkbox" id="lg"> apply log(x) first (Part 1)</label><span id="msg" class="bad"></span><button id="exit2">Back to bench</button></div>
+<div class="bar" id="game" hidden><b>Which mechanism made this?</b><span id="guess"></span><span id="res"></span><button id="exit">Back to bench</button></div>
+<div class="grid"><canvas id="c0"></canvas><canvas id="c1"></canvas><canvas id="c2"></canvas><canvas id="c3"></canvas><canvas id="c4"></canvas><canvas id="c5"></canvas></div>
+<div class="note" id="hint"></div>
+<div class="note"><b>Try this.</b> (1) Set <i>correlated</i> to max: the top row still looks perfectly normal. Which panel catches it? (2) Set <i>none</i> and look at the log panel: why does a clean sample still look fine after log? (3) Take a screenshot of a mystery and ask your AI to diagnose it, then reveal the answer. Did it get the correlated one? Your judgment is the part the AI can't skip.</div>
+<script>
+const $=id=>document.getElementById(id);let R;
+const mk=s=>()=>{s|=0;s=s+0x6D2B79F5|0;let t=Math.imul(s^s>>>15,1|s);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296};
+const gs=()=>Math.sqrt(-2*Math.log(1-R()))*Math.cos(2*Math.PI*R());
+const N=['normal','mixture','correlated','heavy','product'];
+const HINT={normal:"Nothing wrong. Histogram and Q-Q hug the normal, running mean settles, autocorrelation is ~0, groups overlap.",
+mixture:"Split-by-covariate panel: the two groups sit in different places. The combined histogram goes wide, flat or bimodal.",
+correlated:"Autocorrelation panel: bars well above 0 at small lags. Histogram and Q-Q look normal, and the running mean wanders.",
+heavy:"Q-Q plot: tails peel away from the line. A few extreme points stretch the histogram, and the running mean jumps.",
+product:"Log panel: log(x) is bell-shaped while x is right-skewed. The Q-Q plot curves upward."};
+const G={
+normal:(n,s)=>({x:Array.from({length:n},()=>5+gs())}),
+mixture:(n,s)=>{const g=[],x=[];for(let i=0;i<n;i++){const k=R()<.5?1:0;g.push(k);x.push(5+gs()+k*s*5)}return{x,g}},
+correlated:(n,s)=>{const f=s*.97,q=Math.sqrt(1-f*f);let p=gs();const x=[];for(let i=0;i<n;i++){p=f*p+q*gs();x.push(5+p)}return{x}},
+heavy:(n,s)=>{const df=Math.max(1,Math.round(30*(1-s)));return{x:Array.from({length:n},()=>{let c=0;for(let k=0;k<df;k++){const z=gs();c+=z*z}return 5+gs()/Math.sqrt(c/df)})}},
+product:(n,s)=>({x:Array.from({length:n},()=>5*Math.exp(gs()*(.12+s*1.1)))})};
+const mean=a=>a.reduce((p,c)=>p+c,0)/a.length,sd=a=>{const m=mean(a);return Math.sqrt(mean(a.map(v=>(v-m)**2)))};
+const qn=p=>{const l=p<.5,q=l?p:1-p,t=Math.sqrt(-2*Math.log(q)),z=t-(2.515517+.802853*t+.010328*t*t)/(1+1.432788*t+.189269*t*t+.001308*t**3);return l?-z:z};
+const npdf=(v,m,s)=>Math.exp(-.5*((v-m)/s)**2)/(s*2.5066);
+const css=n=>getComputedStyle(document.documentElement).getPropertyValue(n);
+function P(id,title,xr,yr,draw){const c=$(id),d=devicePixelRatio||1,W=c.clientWidth,H=c.clientHeight;c.width=W*d;c.height=H*d;const x=c.getContext('2d');x.scale(d,d);
+const m={l:36,r:8,t:22,b:20},X=v=>m.l+(v-xr[0])/(xr[1]-xr[0]||1)*(W-m.l-m.r),Y=v=>H-m.b-(v-yr[0])/(yr[1]-yr[0]||1)*(H-m.t-m.b);
+x.fillStyle=css('--fg');x.font='12px system-ui';x.fillText(title,m.l,14);x.strokeStyle=css('--bd');x.strokeRect(m.l,m.t,W-m.l-m.r,H-m.t-m.b);
+x.fillStyle=css('--mut');x.font='10px system-ui';x.fillText(yr[1].toPrecision(2),2,m.t+8);x.fillText(yr[0].toPrecision(2),2,H-m.b);x.fillText(xr[0].toPrecision(3),m.l,H-6);x.fillText(xr[1].toPrecision(3),W-m.r-30,H-6);
+draw(x,X,Y);}
+function bins(a,lo,hi,k){const b=Array(k).fill(0);a.forEach(v=>{const i=Math.min(k-1,Math.floor((v-lo)/(hi-lo)*k));if(i>=0)b[i]++});return b.map(c=>c/a.length/((hi-lo)/k))}
+function hist(id,title,a){const lo=Math.min(...a),hi=Math.max(...a),k=40,b=bins(a,lo,hi,k),m=mean(a),s=sd(a),top=Math.max(...b,npdf(m,m,s));
+P(id,title,[lo,hi],[0,top],(x,X,Y)=>{x.fillStyle=css('--c1');x.globalAlpha=.6;b.forEach((v,i)=>{const x0=X(lo+i*(hi-lo)/k),x1=X(lo+(i+1)*(hi-lo)/k);x.fillRect(x0,Y(v),x1-x0-1,Y(0)-Y(v))});x.globalAlpha=1;
+x.strokeStyle=css('--fg');x.setLineDash([4,3]);x.beginPath();for(let i=0;i<=200;i++){const v=lo+i*(hi-lo)/200;i?x.lineTo(X(v),Y(npdf(v,m,s))):x.moveTo(X(v),Y(npdf(v,m,s)))}x.stroke();x.setLineDash([])})}
+function line(id,title,ys,yr,dots){P(id,title,[0,ys.length-1],yr,(x,X,Y)=>{x.strokeStyle=css('--c1');x.fillStyle=css('--c1');x.beginPath();ys.forEach((v,i)=>{i?x.lineTo(X(i),Y(v)):x.moveTo(X(i),Y(v));});if(!dots)x.stroke();else ys.forEach((v,i)=>{x.fillRect(X(i)-2,Y(v)-2,4,4)});
+x.strokeStyle=css('--mut');x.beginPath();x.moveTo(X(0),Y(0));x.lineTo(X(ys.length-1),Y(0));x.stroke()})}
+function draw(d){const a=d.x,n=a.length,m=mean(a),s=sd(a);
+hist('c0','histogram vs normal',a);
+const so=[...a].sort((p,q)=>p-q),th=so.map((_,i)=>qn((i+.5)/n)),lo=so[0],hi=so[n-1];
+P('c1','Q-Q plot',[th[0],th[n-1]],[lo,hi],(x,X,Y)=>{x.fillStyle=css('--c1');so.forEach((v,i)=>x.fillRect(X(th[i])-1.5,Y(v)-1.5,3,3));const q25=so[Math.floor(n*.25)],q75=so[Math.floor(n*.75)],sl=(q75-q25)/1.349,q50=so[Math.floor(n/2)];x.strokeStyle=css('--fg');x.setLineDash([4,3]);x.beginPath();x.moveTo(X(th[0]),Y(q50+sl*th[0]));x.lineTo(X(th[n-1]),Y(q50+sl*th[n-1]));x.stroke();x.setLineDash([])});
+if(a.every(v=>v>0)&&!d.nolog)hist('c2','histogram of log(x)',a.map(Math.log));else P('c2',d.nolog?'log panel off (already logged)':'log: not possible (values <= 0)',[0,1],[0,1],()=>{});
+let cs=0;const rm=a.map((v,i)=>(cs+=v)/(i+1)),rl=Math.min(...rm),rh=Math.max(...rm);line('c3','running mean',rm,[rl,rh]);
+const dm=a.map(v=>v-m),den=dm.reduce((p,v)=>p+v*v,0),ac=[];for(let l=0;l<=50;l++){let t=0;for(let i=0;i<n-l;i++)t+=dm[i]*dm[i+l];ac.push(t/den)}line('c4','autocorrelation (lags 0-50)',ac,[Math.min(0,...ac),1],true);
+if(d.g||true){const g=d.g||a.map(()=>R()<.5?1:0);d.g=g;const A=a.filter((_,i)=>!g[i]),B=a.filter((_,i)=>g[i]),k=40,b0=bins(A,lo,hi,k),b1=bins(B,lo,hi,k),t=Math.max(...b0,...b1);
+P('c5','split by covariate (blue = 0, red = 1)',[lo,hi],[0,t],(x,X,Y)=>{[[b0,'--c1'],[b1,'--c2']].forEach(([b,c])=>{x.fillStyle=css(c);x.globalAlpha=.5;b.forEach((v,i)=>{const x0=X(lo+i*(hi-lo)/k),x1=X(lo+(i+1)*(hi-lo)/k);x.fillRect(x0,Y(v),x1-x0-1,Y(0)-Y(v))})});x.globalAlpha=1})}}
+let cur=null,mode='bench',secret=null;
+function gen(){R=mk(Math.random()*1e9);const k=mode==='bench'?$('mech').value:secret,s=mode==='bench'?+$('str').value:secret_s;cur=G[k](+$('n').value,s);draw(cur);}
+let secret_s=.7;
+function show(){if(mode==='upload'){$('hint').innerHTML='<b>Your lab data.</b> No key here: read all six panels, then write your table. The two top-right/bottom panels that read row order are the running mean and autocorrelation, so the rows are kept in file order.';return}$('hint').innerHTML=mode==='bench'?'<b>Fingerprint:</b> '+HINT[$('mech').value]:'Mystery mode: no peeking at the label. One of the five is a plain normal sample.'}
+$('mech').onchange=()=>{show();gen()};$('str').oninput=gen;$('n').oninput=()=>{$('nv').textContent=$('n').value;gen()};$('re').onclick=()=>{if(mode==='bench')gen();else newMystery()};
+function newMystery(){mode='mystery';secret=N[Math.floor(Math.random()*5)];secret_s=.55+Math.random()*.4;$('bench').hidden=true;$('game').hidden=false;$('res').textContent='';$('guess').innerHTML=N.map(k=>`<button data-k="${k}">${k==='normal'?'none':k}</button>`).join('');show();gen()}
+$('mys').onclick=newMystery;
+$('guess').onclick=e=>{const k=e.target.dataset.k;if(!k)return;const ok=k===secret;$('res').innerHTML=` <span class="${ok?'good':'bad'}">${ok?'Correct.':'It was '+(secret==='normal'?'none (plain normal)':secret)+'.'}</span> ${HINT[secret]} <button class="p" onclick="newMystery()">Next</button>`}
+$('exit').onclick=()=>{mode='bench';$('bench').hidden=false;$('game').hidden=true;show();gen()};
+addEventListener('resize',()=>cur&&draw(cur));matchMedia('(prefers-color-scheme:dark)').addEventListener('change',()=>cur&&draw(cur));
+
+async function readNpz(buf){const dv=new DataView(buf),u=new Uint8Array(buf);let e=u.length-22;while(e>0&&dv.getUint32(e,true)!==0x06054b50)e--;
+const cnt=dv.getUint16(e+10,true);let p=dv.getUint32(e+16,true);const out={};
+for(let i=0;i<cnt;i++){const meth=dv.getUint16(p+10,true),csz=dv.getUint32(p+20,true),nl=dv.getUint16(p+28,true),xl=dv.getUint16(p+30,true),cl=dv.getUint16(p+32,true),off=dv.getUint32(p+42,true);
+const name=new TextDecoder().decode(u.subarray(p+46,p+46+nl));p+=46+nl+xl+cl;
+const s=off+30+dv.getUint16(off+26,true)+dv.getUint16(off+28,true);let data=u.slice(s,s+csz);
+if(meth===8)data=new Uint8Array(await new Response(new Blob([data]).stream().pipeThrough(new DecompressionStream('deflate-raw'))).arrayBuffer());
+out[name.replace(/\.npy$/,'')]=npy(data)}return out}
+function npy(u){const dv=new DataView(u.buffer,u.byteOffset,u.byteLength),v=u[6],hl=v===1?dv.getUint16(8,true):dv.getUint32(8,true),hs=v===1?10:12,
+h=new TextDecoder().decode(u.subarray(hs,hs+hl)),c=/'descr':\s*'[<|=]?([a-zA-Z]\d)'/.exec(h)[1],t=c[0],z=+c[1],o=hs+hl,n=(u.length-o)/z,r=new Array(n);
+for(let i=0;i<n;i++){const q=o+i*z;r[i]=t==='f'?(z===8?dv.getFloat64(q,true):dv.getFloat32(q,true)):t==='i'?(z===8?Number(dv.getBigInt64(q,true)):z===4?dv.getInt32(q,true):z===2?dv.getInt16(q,true):dv.getInt8(q)):(z===8?Number(dv.getBigUint64(q,true)):z===4?dv.getUint32(q,true):z===2?dv.getUint16(q,true):dv.getUint8(q))}return r}
+let L=null,lk=null;
+function redraw(){let x=L[lk],g=L[lk+'_group'],nolog=false;$('msg').textContent='';
+if($('lg').checked){if(x.some(v=>v<=0))$('msg').textContent=' log undefined: this one has values <= 0.';else{x=x.map(Math.log);nolog=true}}
+cur={x,g:g||null,nolog};show();draw(cur)}
+$('up').onclick=()=>$('fi').click();
+$('fi').onchange=async e=>{const f=e.target.files[0];if(!f)return;try{L=await readNpz(await f.arrayBuffer());const ks=Object.keys(L).filter(k=>!k.endsWith('_group'));if(!ks.length)throw 0;
+mode='upload';$('bench').hidden=true;$('game').hidden=true;$('lab').hidden=false;$('ds').innerHTML=ks.map(k=>`<button data-k="${k}">${k}</button>`).join('');lk=ks[0];redraw()}catch(err){alert('Could not read that .npz. Expected 1-D arrays like a, a_group, b, b_group.')}e.target.value=''};
+$('ds').onclick=e=>{if(e.target.dataset.k){lk=e.target.dataset.k;redraw()}};$('lg').onchange=redraw;
+$('exit2').onclick=()=>{mode='bench';$('lab').hidden=true;$('bench').hidden=false;show();gen()};
+show();gen();
+</script></main></body></html>
