@@ -5,6 +5,21 @@
 Course materials are distributed through this repository. Pull regularly — lectures
 and labs are pushed as the semester progresses.
 
+## Updated files
+
+**October 28:** `Lectures/Lecture.20/Lecture.20.ipynb`, `Lectures/Lecture.21/Lecture.21.ipynb` and
+`Kaggle Tabular Data.ipynb` were updated with more explanation (no code changed). If you have run or
+edited your own copy of any of them, set it aside **before** you pull, or `git pull` will refuse or
+conflict, and a conflicted notebook won't open in Jupyter:
+
+```bash
+mv Lectures/Lecture.20/Lecture.20.ipynb Lectures/Lecture.20/Lecture.20.mine.ipynb   # same for the others
+git checkout -- Lectures/Lecture.20/Lecture.20.ipynb     # only if git still sees it as modified
+git pull
+```
+
+If you never touched them, just `git pull`.
+
 ## Contents
 
 | Path | What's there |
